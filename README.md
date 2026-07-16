@@ -2,21 +2,14 @@
 A two wheeled self balancing robot build using arduiono and mpu6050 
 
 
-<p align="center">
-  <img 
-    src="https://github.com/user-attachments/assets/b41f6a55-211b-4595-87ec-8bacf416cde8"
-    alt="Self-Balancing Robot"
-    width="500"
-  />
-</p>
-
-
-
 This project is a two-wheel self-balancing robot designed to maintain an upright position using real-time feedback control. The robot is based on the principle of an inverted pendulum, an inherently unstable system in which the wheels must continuously move beneath the robot's center of mass to prevent it from falling. When an external disturbance pushes the robot away from its balance point, the controller detects the change in tilt and drives the motors in the required direction to recover and return the robot to its upright position.
 
 ## 🎥 Demonstration
 
-<img width="378" height="550" alt="WhatsAppVideo2026-07-16at23 49 05-ezgif com-optimize" src="https://github.com/user-attachments/assets/34170f84-581f-4859-abc5-0de48bb81556" />
+
+
+
+https://github.com/user-attachments/assets/ef3872db-a0dd-4728-b262-816b82042763
 
 
 
