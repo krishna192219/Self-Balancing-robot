@@ -20,9 +20,6 @@ its balance point.
 
 
 
-https://github.com/user-attachments/assets/147442df-444e-4ff3-8440-5c71cb9d8b86
-
-
 ## Hardware and Mechanical Design
 
 ### Arduino Nano — Main Controller
