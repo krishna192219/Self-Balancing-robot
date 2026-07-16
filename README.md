@@ -1,5 +1,5 @@
 # Self-Balancing-robot
-A two wheeled self balancing robot build using arduiono and mpu6050 
+A two wheeled self balancing robot build using Arduino and mpu6050 
 
 
 This project is a two-wheel self-balancing robot designed to maintain an upright position using real-time feedback control. The robot is based on the principle of an inverted pendulum, an inherently unstable system in which the wheels must continuously move beneath the robot's center of mass to prevent it from falling. When an external disturbance pushes the robot away from its balance point, the controller detects the change in tilt and drives the motors in the required direction to recover and return the robot to its upright position.
