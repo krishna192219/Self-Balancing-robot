@@ -181,7 +181,130 @@ The overall hardware flow is:
     Motor Motor
 
 
-## Demonstration
+## Challenges and Engineering Solutions
+
+Building a self-balancing robot involved much more than simply connecting the components and implementing a PID controller. Since the robot is an inherently unstable system, even small issues with sensor measurements, motor response, control-loop timing, or PID parameters had a significant effect on its ability to balance. The following were some of the major challenges I encountered during development.
+
+### 1. IMU Communication and Library Compatibility
+
+One of the first major problems I faced was with the IMU. The sensor was not communicating reliably with the MPU6050 libraries I initially tried to use. After testing the I²C communication and verifying the hardware connections, I decided to remove the dependency on the external IMU library entirely.
+
+Instead, I implemented direct register-level communication using Arduino's `Wire` library. The IMU is initialized by directly configuring its power management, digital low-pass filter, gyroscope range, and accelerometer range registers. The required raw sensor values are then read directly from the data registers.
+
+Although this required more low-level implementation, it gave me better control over the sensor and helped me understand how I²C sensors communicate at the register level.
+
+---
+
+### 2. Finding the Correct IMU Axes
+
+The physical orientation of the IMU on the robot meant that the expected sensor axes did not initially correspond to the robot's forward and backward motion.
+
+In one of my early implementations, tilting the robot forward or backward produced almost no response, while tilting it sideways caused the motors to move. To solve this, I monitored the individual accelerometer and gyroscope readings while manually moving the robot along different axes.
+
+Through this testing, I determined that the combination required for my mounting orientation was:
+
+- `AY` and `AZ` for calculating the accelerometer tilt angle
+- `GX` for measuring the angular velocity
+
+The final control system therefore uses these specific axes for pitch estimation.
+
+---
+
+### 3. IMU Offset and Calibration
+
+Even when the robot was physically positioned at its balance point, the IMU did not always report exactly zero degrees. Small sensor offsets and slight differences in the physical mounting angle caused the controller to continuously command the motors in one direction.
+
+To compensate for this, I implemented an automatic calibration routine that runs when the robot starts. While the robot is held stationary at its desired balancing position, the program collects 1000 sensor samples.
+
+The average gyroscope measurement is used to calculate the gyroscope bias, while the average accelerometer angle is stored as the mounting-angle offset. These values are then subtracted from subsequent measurements so that the physical balancing position of the robot becomes the zero reference for the controller.
+
+---
+
+### 4. Dealing with Sensor Noise and Gyroscope Drift
+
+Using only the accelerometer produced noisy angle measurements because the sensor also responds to vibration and linear acceleration. On the other hand, calculating the angle using only the gyroscope resulted in gradual drift over time.
+
+To overcome this, I implemented a complementary filter that combines both measurements. The gyroscope is given more weight for detecting fast changes in orientation, while the accelerometer provides a long-term reference that corrects accumulated gyro drift.
+
+The IMU's internal digital low-pass filter is also configured to reduce high-frequency sensor noise before the measurements are used by the controller.
+
+---
+
+### 5. Motor Deadzone and Nonlinear Response
+
+During testing, I found that the motors did not start rotating immediately when a small PWM signal was applied. The controller could therefore be producing a correction while the actual wheels remained stationary because the command was not large enough to overcome the static friction of the motors and gearboxes.
+
+I tested the motors separately by gradually changing the PWM value and observing the point at which they started rotating. This allowed me to estimate the minimum useful motor command and implement deadzone compensation in the firmware.
+
+This was particularly important for balancing because small but fast corrections are required around the upright position.
+
+---
+
+### 6. PID Tuning
+
+PID tuning was one of the most time-consuming parts of the project. Initially, the robot was unable to recover from the first fall because the proportional response was not strong enough. Increasing the proportional gain improved the response, but excessive values caused continuous oscillations around the balance point.
+
+The derivative term was then used to provide damping and reduce these oscillations. Instead of numerically calculating the derivative of the estimated angle, I used the angular velocity measured directly by the gyroscope. This provided a more direct measurement of the robot's rotational motion without amplifying noise through numerical differentiation.
+
+The integral gain was kept relatively small and used to compensate for persistent errors around the balance point.
+
+The final PID parameters were determined experimentally by repeatedly testing the physical robot and observing its response to both natural falls and external disturbances.
+
+---
+
+### 7. Maintaining Consistent Motor Performance
+
+Another challenge was that motor behavior could change as the LiPo battery discharged. Since the response of the motors directly affects the dynamics of the robot, changes in the available motor voltage could also affect the performance of the PID controller.
+
+To make the motor supply more consistent as the battery voltage decreased, I added an adjustable XL6009 DC-DC boost converter to the motor power system and configured its output to approximately 12 V.
+
+This helped provide more consistent motor behavior during testing as the battery discharged.
+
+---
+
+### 8. Faster PID Tuning
+
+During the early stages of development, changing a PID parameter required modifying the code, recompiling it, and uploading the entire program again. This made physical PID tuning slow and inconvenient.
+
+To improve the tuning process, I implemented runtime parameter adjustment through serial communication. Parameters such as `Kp`, `Ki`, `Kd`, the balance setpoint, maximum motor output, and motor deadzone can be modified without recompiling the firmware.
+
+For example:
+
+    kp 31
+    ki 1.0
+    kd 0.22
+    set 0
+    max 250
+    dead 10
+
+This significantly reduced the time required to experiment with different controller parameters and observe their effect on the physical robot.
+
+---
+
+### What These Challenges Taught Me
+
+The biggest lesson from this project was that building a real control system is very different from implementing the control equation alone. Sensor noise, calibration errors, motor friction, mechanical construction, power supply behavior, and loop timing all directly influence the performance of the controller.
+
+Debugging these problems individually helped me develop a much better understanding of embedded control systems, IMU sensor processing, feedback control, motor behavior, and the practical challenges involved in implementing an unstable system such as an inverted pendulum on real hardware.
+
+
+## Future Improvements and Features Considered
+
+### Bluetooth-Based Remote Control
+
+I initially planned to add a Bluetooth module to control the robot remotely and allow commands such as moving forward and backward while the robot continued balancing.
+
+However, the current N20 motors do not have encoders. Although the controller knows the direction and PWM command being sent to each motor, it has no feedback about the actual wheel speed or distance travelled. Without this feedback, the robot cannot accurately determine its movement or position, which can cause it to continuously drift instead of performing controlled motion.
+
+For this reason, I decided not to add remote movement control in the current version of the robot. In a future version, I plan to use motors with encoders and implement an additional velocity or position control loop alongside the existing balance controller. This would allow the robot to measure its wheel motion and perform more controlled forward, backward, and stationary balancing.
+
+### Bluetooth-Based PID Tuning
+
+I also considered adding a Bluetooth module for wireless PID tuning. The idea was to change `Kp`, `Ki`, `Kd`, and other controller parameters from a phone while the robot was running, instead of modifying and uploading the firmware after every adjustment.
+
+I implemented support for changing the controller parameters at runtime through serial commands, which could also be extended to work with a Bluetooth serial module. However, during development I was able to experimentally find PID gains that produced satisfactory balancing performance before completing the Bluetooth interface.
+
+Since wireless tuning was no longer necessary for the current prototype, I decided not to add the extra hardware and complexity. The runtime tuning functionality remains part of the firmware and could be connected to a Bluetooth module in a future version if further controller development is required.
 
 
 
